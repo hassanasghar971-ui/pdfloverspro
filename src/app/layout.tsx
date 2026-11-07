@@ -14,9 +14,6 @@ import SocialBarGate from '@/components/SocialBarGate';
 
 const DEFAULT_TITLE = `${SITE.name}: ${TOOL_COUNT} Free PDF Tools in Your Browser`;
 
-const WHATSAPP_PRIMARY_URL = 'https://wa.me/923451098607';
-const WHATSAPP_SECONDARY_URL = 'https://wa.me/923497726469';
-
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
@@ -159,26 +156,30 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   {SITE.email}
                 </a>
               </p>
-              <p className="mt-1 text-sm">
-                <a
-                  href={WHATSAPP_PRIMARY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-slate-700 hover:text-brand-600"
-                >
-                  WhatsApp: {SITE.whatsappPrimary}
-                </a>
-              </p>
-              <p className="mt-1 text-sm">
-                <a
-                  href={WHATSAPP_SECONDARY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-slate-700 hover:text-brand-600"
-                >
-                  WhatsApp: {SITE.whatsappSecondary}
-                </a>
-              </p>
+              {SITE.whatsappPrimary && (
+                <p className="mt-1 text-sm">
+                  <a
+                    href={`https://wa.me/${SITE.whatsappPrimary.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-slate-700 hover:text-brand-600"
+                  >
+                    WhatsApp: {SITE.whatsappPrimary}
+                  </a>
+                </p>
+              )}
+              {SITE.whatsappSecondary && (
+                <p className="mt-1 text-sm">
+                  <a
+                    href={`https://wa.me/${SITE.whatsappSecondary.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-slate-700 hover:text-brand-600"
+                  >
+                    WhatsApp: {SITE.whatsappSecondary}
+                  </a>
+                </p>
+              )}
             </div>
           </div>
           <div className="border-t border-slate-200 py-4 text-center text-xs text-slate-500">
