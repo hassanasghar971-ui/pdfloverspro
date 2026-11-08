@@ -1,43 +1,84 @@
-name: Master Audit & Verification
+name: Audit
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
 
-      - name: Install dependencies
+      - name: Install
         run: npm install --no-audit --no-fund
 
-      - name: Verify Registry
-        run: npm run verify
-        continue-on-error: true
+      - name: Typecheck
+        run: npm run typecheck
 
-      - name: Verify Content Word Counts & Duplications
-        run: npm run verify:content
-        continue-on-error: true
-
-      - name: Check Engine Constraints
+      - name: Verify engine
+        if: ${{ !cancelled() }}
         run: npm run verify:engine
-        continue-on-error: true
 
-      - name: Who requires image-size (Dependency Audit Debug)
-        if: always()
-        continue-on-error: true
-        run: npm ls image-size
+      - name: Verify content
+        if: ${{ !cancelled() }}
+        run: npm run verify:content
 
-      - name: Run npm audit (Informational)
-        if: always()
+      - name: Verify registry
+        if: ${{ !cancelled() }}
+        run: npm run verify
+
+      - name: Master audit (report only)
+        if: ${{ !cancelled() }}
         continue-on-error: true
-        run: npm audit
+        shell: bash
+        run: |
+          mkdir -p reports
+          npm run audit:master 2>&1 | tee reports/master-audit.txt
+
+      - name: Score report (report only)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p reports
+          npm run score 2>&1 | tee reports/score.txt
+
+      - name: Dependency info (image-size)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p reports
+          npm ls image-size 2>&1 | tee reports/npm-ls-image-size.txt
+
+      - name: npm audit (informational)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p reports
+          npm audit 2>&1 | tee reports/npm-audit.txt
+
+      - name: Upload reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: audit-reports
+          path: reports/
+          if-no-files-found: ignore
+          retention-days: 14
