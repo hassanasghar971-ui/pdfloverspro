@@ -8,25 +8,17 @@ export interface GatedScript {
 
 export const NATIVE_BANNER = {
   scriptId: 'ad-native-banner',
-  containerId: 'container-f51e74a40c326ccb95a7a043005bd0ae',
-  src: 'https://bauval.org/21/f51e74a40c326ccb95a7a043005bd0ae',
+  containerId: 'container-2219d728bd140f492c47b5e49fe870ad',
+  src: 'https://bauval.org/21/2219d728bd140f492c47b5e49fe870ad',
 } as const;
 
 export const GATED_SCRIPTS: GatedScript[] = [
   {
     id: 'adsterra-social-bar',
-    src: 'https://pl31804194.profitableratecpmnetwork.com/72/bc/4b/72bc4b4ca161783e4681f10c50bbf607.js',
+    src: 'https://bauval.org/14/e82678238737ef67a400827536c7a4db',
     countKey: 'plp_sb_loads',
     maxLoads: 2,
     interactionsNeeded: 2,
-  },
-  {
-    // Format not confirmed (Social Bar or Popunder). Check the Adsterra dashboard.
-    id: 'ad-extra-unit',
-    src: 'https://bauval.org/14/da0660016dcfaa6988e2c35f05108ab4',
-    countKey: 'plp_x1_loads',
-    maxLoads: 1,
-    interactionsNeeded: 3,
   },
 ];
 
