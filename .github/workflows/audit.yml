@@ -13,10 +13,13 @@ concurrency:
   group: audit-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+
 jobs:
   audit:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -30,17 +33,40 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Check 42 tools and duplicate content keys
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const s = fs.readFileSync('src/lib/tool-content.ts', 'utf8');
+          const keys = [...s.matchAll(/^\s*'([a-z0-9-]+)':\s*\{/gm)].map(x => x[1]);
+          const dupes = keys.filter((x, i) => keys.indexOf(x) !== i);
+          console.log('tool-content keys:', keys.length, 'dupes:', dupes);
+          if (keys.length !== 42 || dupes.length > 0) {
+            console.error('FAIL: expected 42 unique keys in tool-content.ts');
+            process.exit(1);
+          }
+          EOF
+
       - name: Verify engine
         if: ${{ !cancelled() }}
         run: npm run verify:engine
 
-      - name: Verify content
-        if: ${{ !cancelled() }}
-        run: npm run verify:content
-
-      - name: Verify registry
+      - name: Verify registry (42 tools)
         if: ${{ !cancelled() }}
         run: npm run verify
+
+      - name: Verify content (no duplicate sentences)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          mkdir -p reports
+          npm run verify:content 2>&1 | tee reports/verify-content.txt
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: npm run build
 
       - name: Master audit (report only)
         if: ${{ !cancelled() }}
