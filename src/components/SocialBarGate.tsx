@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { CONSENT_CHANGED_EVENT, adsAllowed, resolveMode } from '@/lib/consent';
 
 const SOCIAL_BAR_SRC =
   'https://pl31804194.profitableratecpmnetwork.com/72/bc/4b/72bc4b4ca161783e4681f10c50bbf607.js';
@@ -9,14 +10,11 @@ const COUNT_KEY = 'plp_sb_loads';
 const MAX_LOADS_PER_SESSION = 2;
 const INTERACTIONS_NEEDED = 2;
 
-/** Returns null when sessionStorage is unavailable (then we do not load the ad). */
-function readLoads(): number | null {
+function readLoads(): number {
   try {
-    const raw = window.sessionStorage.getItem(COUNT_KEY);
-    const n = raw === null ? 0 : Number.parseInt(raw, 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
+    return Number(window.sessionStorage.getItem(COUNT_KEY) || '0');
   } catch {
-    return null;
+    return 0;
   }
 }
 
@@ -24,34 +22,20 @@ function writeLoads(n: number): void {
   try {
     window.sessionStorage.setItem(COUNT_KEY, String(n));
   } catch {
-    /* storage unavailable: readLoads() returns null, so nothing loads */
+    // ignore
   }
 }
 
-export default function SocialBarGate(): null {
+export default function SocialBarGate() {
   useEffect(() => {
-    const initial = readLoads();
-    if (initial === null || initial >= MAX_LOADS_PER_SESSION) return;
-    if (document.getElementById(SCRIPT_ID)) return;
-
     let interactions = 0;
-    let loaded = false;
+    void resolveMode();
 
-    function stop(): void {
-      window.removeEventListener('pointerdown', onInteract);
-      window.removeEventListener('keydown', onInteract);
-      window.removeEventListener('plp:action', load);
-      document.removeEventListener('plp:action', load);
-    }
-
-    function load(): void {
-      if (loaded) return;
-      loaded = true;
-      stop();
+    const tryLoad = () => {
+      if (!adsAllowed()) return;
       if (document.getElementById(SCRIPT_ID)) return;
-      const used = readLoads();
-      if (used === null || used >= MAX_LOADS_PER_SESSION) return;
-      writeLoads(used + 1);
+      const loads = readLoads();
+      if (loads >= MAX_LOADS_PER_SESSION) return;
 
       const s = document.createElement('script');
       s.id = SCRIPT_ID;
@@ -59,19 +43,34 @@ export default function SocialBarGate(): null {
       s.async = true;
       s.setAttribute('data-cfasync', 'false');
       document.body.appendChild(s);
-    }
+      writeLoads(loads + 1);
+    };
 
-    function onInteract(): void {
+    const onInteraction = () => {
+      if (!adsAllowed()) return;
       interactions += 1;
-      if (interactions >= INTERACTIONS_NEEDED) load();
-    }
+      if (interactions >= INTERACTIONS_NEEDED) tryLoad();
+    };
 
-    window.addEventListener('pointerdown', onInteract, { passive: true });
-    window.addEventListener('keydown', onInteract, { passive: true });
-    window.addEventListener('plp:action', load);
-    document.addEventListener('plp:action', load);
+    const onAction = () => tryLoad();
 
-    return stop;
+    const onConsent = () => {
+      if (!adsAllowed()) {
+        document.getElementById(SCRIPT_ID)?.remove();
+        interactions = 0;
+      }
+    };
+
+    window.addEventListener('pointerdown', onInteraction, { passive: true });
+    window.addEventListener('keydown', onInteraction);
+    window.addEventListener('plp:action', onAction);
+    window.addEventListener(CONSENT_CHANGED_EVENT, onConsent);
+    return () => {
+      window.removeEventListener('pointerdown', onInteraction);
+      window.removeEventListener('keydown', onInteraction);
+      window.removeEventListener('plp:action', onAction);
+      window.removeEventListener(CONSENT_CHANGED_EVENT, onConsent);
+    };
   }, []);
 
   return null;
