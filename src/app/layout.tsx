@@ -11,6 +11,7 @@ import {
 } from '@/lib/tools-registry';
 import { safeJson } from '@/lib/tool-view';
 import SocialBarGate from '@/components/SocialBarGate';
+import ConsentBanner, { CookieSettingsButton } from '@/components/ConsentBanner';
 
 const DEFAULT_TITLE = `${SITE.name}: ${TOOL_COUNT} Free PDF Tools in Your Browser`;
 
@@ -147,6 +148,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                     </Link>
                   </li>
                 ))}
+                <li>
+                  <CookieSettingsButton className="text-left text-slate-700 hover:text-brand-600" />
+                </li>
               </ul>
               <p className="mt-4 text-sm text-slate-600">
                 {SITE.founderTitle}: {SITE.founder}
@@ -197,6 +201,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
 
         <SocialBarGate />
+        <ConsentBanner />
       </body>
     </html>
   );
