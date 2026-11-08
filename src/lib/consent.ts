@@ -10,7 +10,7 @@ const MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 export const CONSENT_CHANGED_EVENT = 'plp:consent';
 export const CONSENT_OPEN_EVENT = 'plp:consent-open';
 
-let memoryDecision: ConsentValue | null = null;
+ulet memoryDecision: ConsentValue | null = null;
 let memoryMode: ConsentMode | null = null;
 let modePromise: Promise<ConsentMode> | null = null;
 
@@ -125,4 +125,13 @@ export function useAdsAllowed(): boolean {
     return () => window.removeEventListener(CONSENT_CHANGED_EVENT, update);
   }, []);
   return allowed;
+}
+/** Read-only snapshot of every input to the ad decision. Useful for debugging and a future CMP. */
+export function consentSignals(): {
+  mode: ConsentMode | null;
+  decision: ConsentValue | null;
+  gpc: boolean;
+  allowed: boolean;
+} {
+  return { mode: getMode(), decision: getDecision(), gpc: hasGpc(), allowed: adsAllowed() };
 }
