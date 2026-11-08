@@ -26,24 +26,43 @@ function writeLoads(n: number): void {
   }
 }
 
+function whenIdle(cb: () => void): void {
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(() => cb(), { timeout: 2000 });
+  } else {
+    window.setTimeout(cb, 800);
+  }
+}
+
 export default function SocialBarGate() {
   useEffect(() => {
     let interactions = 0;
+    let pending = false;
     void resolveMode();
 
     const tryLoad = () => {
+      if (pending) return;
       if (!adsAllowed()) return;
       if (document.getElementById(SCRIPT_ID)) return;
-      const loads = readLoads();
-      if (loads >= MAX_LOADS_PER_SESSION) return;
+      if (readLoads() >= MAX_LOADS_PER_SESSION) return;
+      pending = true;
 
-      const s = document.createElement('script');
-      s.id = SCRIPT_ID;
-      s.src = SOCIAL_BAR_SRC;
-      s.async = true;
-      s.setAttribute('data-cfasync', 'false');
-      document.body.appendChild(s);
-      writeLoads(loads + 1);
+      whenIdle(() => {
+        pending = false;
+        if (!adsAllowed()) return;
+        if (document.visibilityState !== 'visible') return;
+        if (document.getElementById(SCRIPT_ID)) return;
+        const loads = readLoads();
+        if (loads >= MAX_LOADS_PER_SESSION) return;
+
+        const s = document.createElement('script');
+        s.id = SCRIPT_ID;
+        s.src = SOCIAL_BAR_SRC;
+        s.async = true;
+        s.setAttribute('data-cfasync', 'false');
+        document.body.appendChild(s);
+        writeLoads(loads + 1);
+      });
     };
 
     const onInteraction = () => {
