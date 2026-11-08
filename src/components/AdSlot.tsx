@@ -2,20 +2,9 @@
 
 import { useEffect, useRef } from 'react';
 import { useAdsAllowed } from '@/lib/consent';
+import { NATIVE_BANNER, injectScript, whenIdle } from '@/lib/ads';
 
-const CONTAINER_ID = 'container-8af9b4ea9bf1c8a1daa4e46faa003ae7';
-const SCRIPT_SRC =
-  'https://pl31646499.profitableratecpmnetwork.com/8af9b4ea9bf1c8a1daa4e46faa003ae7/invoke.js';
-const SCRIPT_ID = 'adsterra-native-banner';
-
-function whenIdle(cb: () => void): void {
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(() => cb(), { timeout: 3000 });
-  } else {
-    window.setTimeout(cb, 1500);
-  }
-}
-
+// The container id is fixed by the network: use this component at most ONCE per page.
 export default function AdSlot({ className = '' }: { className?: string }) {
   const allowed = useAdsAllowed();
   const boxRef = useRef<HTMLDivElement>(null);
@@ -29,34 +18,29 @@ export default function AdSlot({ className = '' }: { className?: string }) {
     let observer: IntersectionObserver | null = null;
 
     const load = () => {
-      if (cancelled || document.getElementById(SCRIPT_ID)) return;
-      const s = document.createElement('script');
-      s.id = SCRIPT_ID;
-      s.src = SCRIPT_SRC;
-      s.async = true;
-      s.setAttribute('data-cfasync', 'false');
-      document.body.appendChild(s);
+      if (cancelled || document.getElementById(NATIVE_BANNER.scriptId)) return;
+      injectScript(NATIVE_BANNER.scriptId, NATIVE_BANNER.src);
     };
 
-    if ('IntersectionObserver' in window) {
+    if (typeof IntersectionObserver === 'function') {
       observer = new IntersectionObserver(
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) {
             observer?.disconnect();
-            whenIdle(load);
+            whenIdle(load, 3000);
           }
         },
         { rootMargin: '200px' },
       );
       observer.observe(box);
     } else {
-      whenIdle(load);
+      whenIdle(load, 3000);
     }
 
     return () => {
       cancelled = true;
       observer?.disconnect();
-      document.getElementById(SCRIPT_ID)?.remove();
+      document.getElementById(NATIVE_BANNER.scriptId)?.remove();
     };
   }, [allowed]);
 
@@ -67,7 +51,7 @@ export default function AdSlot({ className = '' }: { className?: string }) {
       <p className="mb-1 text-center text-[11px] uppercase tracking-wider text-slate-400">
         Advertisement
       </p>
-      <div id={CONTAINER_ID} ref={boxRef} style={{ minHeight: 280 }} />
+      <div id={NATIVE_BANNER.containerId} ref={boxRef} style={{ minHeight: 280 }} />
     </aside>
   );
 }
