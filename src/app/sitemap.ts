@@ -2,10 +2,11 @@ import type { MetadataRoute } from "next";
 import { getAvailableToolSlugs } from "@/lib/tool-availability";
 import { LEGAL_PAGES } from "@/lib/tools-registry";
 import { TOOL_CONTENT } from "@/lib/tool-content";
+import { SITE_URL } from "@/lib/site-url";
 
 export const dynamic = "force-static";
 
-const BASE_URL = "https://pdflovers.com";
+const BASE_URL = SITE_URL;
 
 /*
  * lastmod rules: Google only trusts this field if it changes when the page
