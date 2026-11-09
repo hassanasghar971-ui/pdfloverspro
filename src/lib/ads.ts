@@ -22,7 +22,9 @@ export const GATED_SCRIPTS: readonly GatedScript[] = [
   },
 ];
 
-function debugOn(): boolean {
+type LogWindow = Window & { __plpAdsLog?: string[] };
+
+export function isAdsDebug(): boolean {
   if (typeof window === 'undefined') return false;
   try {
     return (
@@ -34,9 +36,17 @@ function debugOn(): boolean {
   }
 }
 
-/** Prints to the Console only when the page is opened with ?adsdebug=1 */
+/** Logs only when the page is opened with ?adsdebug=1 (Console and on-screen panel). */
 export function adsDebug(...args: unknown[]): void {
-  if (debugOn()) console.info('[ads]', ...args);
+  if (!isAdsDebug()) return;
+  console.info('[ads]', ...args);
+  try {
+    const w = window as LogWindow;
+    if (!w.__plpAdsLog) w.__plpAdsLog = [];
+    w.__plpAdsLog.push(args.map((a) => String(a)).join(' '));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function whenIdle(cb: () => void, timeout = 2000): void {
@@ -64,7 +74,18 @@ export function bumpCount(key: string): void {
   }
 }
 
-export function injectScript(id: string, src: string): HTMLScriptElement | null {
+export interface InjectOptions {
+  /** Insert into this element instead of document.body. */
+  parent?: Element;
+  /** With parent: insert before this child (like the official snippet order). */
+  before?: Element | null;
+}
+
+export function injectScript(
+  id: string,
+  src: string,
+  opts: InjectOptions = {},
+): HTMLScriptElement | null {
   if (typeof document === 'undefined') return null;
   const existing = document.getElementById(id);
   if (existing) return existing as HTMLScriptElement;
@@ -76,8 +97,13 @@ export function injectScript(id: string, src: string): HTMLScriptElement | null 
   s.setAttribute('data-cfasync', 'false');
   s.onload = () => adsDebug('script loaded:', id);
   s.onerror = () =>
-    adsDebug('script FAILED (CSP, ad blocker or network). Check Console for "Refused to" and the Network tab:', id, src);
-  document.body.appendChild(s);
+    adsDebug('script FAILED (CSP, ad blocker or network):', id, src);
+
+  if (opts.parent) {
+    opts.parent.insertBefore(s, opts.before ?? null);
+  } else {
+    document.body.appendChild(s);
+  }
   adsDebug('script injected:', id, src);
   return s;
 }
