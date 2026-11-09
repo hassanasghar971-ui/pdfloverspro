@@ -8,10 +8,35 @@ type AdSlotProps = {
   className?: string;
 };
 
+function readDebugFlag(): boolean {
+  try {
+    if (window.location.search.indexOf('addiag=1') !== -1) return true;
+    return window.localStorage.getItem('plp_addiag') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function wasRequested(): boolean {
+  try {
+    return performance
+      .getEntriesByType('resource')
+      .some((entry) => entry.name.indexOf(NATIVE_BANNER.src) !== -1);
+  } catch {
+    return false;
+  }
+}
+
 export default function AdSlot({ className = '' }: AdSlotProps) {
   const allowed = useAdsAllowed();
   const [box, setBox] = useState<HTMLElement | null>(null);
+  const [debug, setDebug] = useState(false);
+  const [stateText, setStateText] = useState('waiting (not in view yet)');
   const startedRef = useRef(false);
+
+  useEffect(() => {
+    setDebug(readDebugFlag());
+  }, []);
 
   useEffect(() => {
     if (!allowed || !box) return;
@@ -19,19 +44,42 @@ export default function AdSlot({ className = '' }: AdSlotProps) {
     let cancelled = false;
     let observer: IntersectionObserver | null = null;
     let fallbackTimer: number | undefined;
+    let checkTimer: number | undefined;
 
-    const setState = (state: string) => {
+    const report = (state: string, text: string) => {
       box.setAttribute('data-ad-state', state);
+      setStateText(text);
+    };
+
+    const checkFill = () => {
+      if (cancelled) return;
+      const container = document.getElementById(NATIVE_BANNER.containerId);
+      const filled =
+        !!container &&
+        (container.children.length > 0 ||
+          container.querySelector('iframe') !== null ||
+          (container.textContent || '').trim().length > 0);
+      const requested = wasRequested();
+      if (filled) {
+        report('filled', 'filled (ad is showing), requested: ' + (requested ? 'yes' : 'no'));
+      } else {
+        report(
+          'no-fill',
+          'script ran but container still empty after 8s (no-fill or unit not approved), requested: ' +
+            (requested ? 'yes' : 'no')
+        );
+      }
     };
 
     const load = () => {
       if (cancelled || startedRef.current) return;
       if (document.getElementById(NATIVE_BANNER.scriptId)) {
         startedRef.current = true;
+        report('loading', 'script tag already in page');
         return;
       }
       startedRef.current = true;
-      setState('loading');
+      report('loading', 'injecting script...');
 
       const container = box.querySelector('#' + NATIVE_BANNER.containerId);
 
@@ -40,8 +88,16 @@ export default function AdSlot({ className = '' }: AdSlotProps) {
       script.async = true;
       script.setAttribute('data-cfasync', 'false');
       script.src = NATIVE_BANNER.src;
-      script.onload = () => setState('loaded');
-      script.onerror = () => setState('error');
+      script.onload = () => {
+        report('loaded', 'script loaded, waiting for ad (8s check)...');
+        checkTimer = window.setTimeout(checkFill, 8000);
+      };
+      script.onerror = () => {
+        report(
+          'error',
+          'script request FAILED (ad blocker, Brave Shields, private DNS or network)'
+        );
+      };
 
       // Same order as the official snippet: script first, container after it.
       if (container && container.parentNode === box) {
@@ -50,8 +106,6 @@ export default function AdSlot({ className = '' }: AdSlotProps) {
         box.appendChild(script);
       }
     };
-
-    setState('waiting');
 
     if (typeof window.IntersectionObserver === 'function') {
       observer = new IntersectionObserver(
@@ -73,6 +127,7 @@ export default function AdSlot({ className = '' }: AdSlotProps) {
       cancelled = true;
       if (observer) observer.disconnect();
       if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer);
+      if (checkTimer !== undefined) window.clearTimeout(checkTimer);
 
       const script = document.getElementById(NATIVE_BANNER.scriptId);
       if (script && script.parentNode) script.parentNode.removeChild(script);
@@ -96,10 +151,12 @@ export default function AdSlot({ className = '' }: AdSlotProps) {
       <p className="mb-1 text-center text-xs uppercase tracking-wide text-slate-600">
         Advertisement
       </p>
-      <div
-        id={NATIVE_BANNER.containerId}
-        style={{ minHeight: 280 }}
-      />
+      {debug ? (
+        <p className="mb-1 text-center text-xs text-slate-700">
+          AdSlot state: {stateText}
+        </p>
+      ) : null}
+      <div id={NATIVE_BANNER.containerId} style={{ minHeight: 280 }} />
     </aside>
   );
 }
