@@ -13,6 +13,7 @@ import { safeJson } from '@/lib/tool-view';
 import SocialBarGate from '@/components/SocialBarGate';
 import ConsentBanner, { CookieSettingsButton } from '@/components/ConsentBanner';
 import AdSlot from '@/components/AdSlot';
+import AdDiagnostic from '@/components/AdDiagnostic';
 
 const DEFAULT_TITLE = `${SITE.name}: ${TOOL_COUNT} Free PDF Tools in Your Browser`;
 
@@ -206,6 +207,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
         <SocialBarGate />
         <ConsentBanner />
+        <AdDiagnostic />
       </body>
     </html>
   );
