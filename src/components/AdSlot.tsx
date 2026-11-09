@@ -2,24 +2,32 @@
 
 import { useEffect, useRef } from 'react';
 import { useAdsAllowed } from '@/lib/consent';
-import { NATIVE_BANNER, injectScript, whenIdle } from '@/lib/ads';
+import { NATIVE_BANNER, adsDebug, injectScript, removeScript, whenIdle } from '@/lib/ads';
 
-// The container id is fixed by the network: use this component at most ONCE per page.
 export default function AdSlot({ className = '' }: { className?: string }) {
   const allowed = useAdsAllowed();
-  const boxRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!allowed) return;
-    const box = boxRef.current;
-    if (!box) return;
+    if (!allowed) {
+      adsDebug('native banner: not allowed yet (consent denied, no choice made in opt-in region, GPC, or region not resolved)');
+      return;
+    }
+    const wrap = wrapRef.current;
+    if (!wrap) return;
 
     let cancelled = false;
     let observer: IntersectionObserver | null = null;
 
     const load = () => {
-      if (cancelled || document.getElementById(NATIVE_BANNER.scriptId)) return;
-      injectScript(NATIVE_BANNER.scriptId, NATIVE_BANNER.src);
+      whenIdle(() => {
+        if (cancelled) return;
+        if (!document.getElementById(NATIVE_BANNER.containerId)) {
+          adsDebug('native banner: container missing in DOM');
+          return;
+        }
+        injectScript(NATIVE_BANNER.scriptId, NATIVE_BANNER.src);
+      });
     };
 
     if (typeof IntersectionObserver === 'function') {
@@ -27,31 +35,33 @@ export default function AdSlot({ className = '' }: { className?: string }) {
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) {
             observer?.disconnect();
-            whenIdle(load, 3000);
+            observer = null;
+            adsDebug('native banner: near viewport, loading');
+            load();
           }
         },
         { rootMargin: '200px' },
       );
-      observer.observe(box);
+      observer.observe(wrap);
     } else {
-      whenIdle(load, 3000);
+      load();
     }
 
     return () => {
       cancelled = true;
       observer?.disconnect();
-      document.getElementById(NATIVE_BANNER.scriptId)?.remove();
+      removeScript(NATIVE_BANNER.scriptId);
+      const container = document.getElementById(NATIVE_BANNER.containerId);
+      if (container) container.innerHTML = '';
     };
   }, [allowed]);
 
   if (!allowed) return null;
 
   return (
-    <aside aria-label="Advertisement" className={`mx-auto w-full max-w-3xl ${className}`}>
-      <p className="mb-1 text-center text-[11px] uppercase tracking-wider text-slate-400">
-        Advertisement
-      </p>
-      <div id={NATIVE_BANNER.containerId} ref={boxRef} style={{ minHeight: 280 }} />
+    <aside ref={wrapRef} aria-label="Advertisement" className={className}>
+      <p className="mb-1 text-center text-xs text-slate-500">Advertisement</p>
+      <div id={NATIVE_BANNER.containerId} style={{ minHeight: 280 }} />
     </aside>
   );
 }
