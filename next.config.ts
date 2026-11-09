@@ -4,7 +4,7 @@ import type { NextConfig } from 'next';
  * Content-Security-Policy
  *
  * Every host below exists for a reason:
- *  - profitableratecpmnetwork.com & bauval.org : Adsterra Social Bar + Native Banner / Scripts
+ *  - profitableratecpmnetwork.com, bauval.org & show-sb.com : Adsterra Social Bar + Native Banner / Scripts
  *  - cdn.jsdelivr.net             : pdf.js CMaps/fonts, tesseract.js worker + core
  *  - tessdata.projectnaptha.com   : tesseract.js language data (OCR)
  *  - cdnjs.cloudflare.com         : kept from the previous policy (probably unused)
@@ -16,7 +16,7 @@ import type { NextConfig } from 'next';
  * If the browser console shows "Refused to ... because it violates the
  * Content Security Policy", add exactly that host to the matching directive.
  * -------------------------------------------------------------------------- */
-const ADSTERRA = 'https://*.profitableratecpmnetwork.com https://bauval.org https://*.bauval.org';
+const ADSTERRA = 'https://*.profitableratecpmnetwork.com https://bauval.org https://*.bauval.org https://show-sb.com https://*.show-sb.com';
 const JSDELIVR = 'https://cdn.jsdelivr.net';
 const TESSDATA = 'https://tessdata.projectnaptha.com';
 const CDNJS = 'https://cdnjs.cloudflare.com';
@@ -28,6 +28,7 @@ const csp = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' https://fonts.gstatic.com data:",
   `connect-src 'self' blob: ${ADSTERRA} ${JSDELIVR} ${TESSDATA} ${CDNJS}`,
+  `frame-src 'self' ${ADSTERRA}`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
