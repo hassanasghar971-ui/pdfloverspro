@@ -1,22 +1,6 @@
 import type { NextConfig } from 'next';
 
-/* -----------------------------------------------------------------------------
- * Content-Security-Policy
- *
- * Every host below exists for a reason:
- *  - profitableratecpmnetwork.com, bauval.org, show-sb.com & cloudpiko.com : Adsterra Social Bar + Native Banner / Scripts
- *  - cdn.jsdelivr.net             : pdf.js CMaps/fonts, tesseract.js worker + core
- *  - tessdata.projectnaptha.com   : tesseract.js language data (OCR)
- *  - cdnjs.cloudflare.com         : kept from the previous policy (probably unused)
- *
- * 'unsafe-inline' is required by Next.js inline bootstrap scripts and the
- * layout's gate script. 'unsafe-eval' is kept because third-party ad scripts
- * commonly need it. Tightening either one needs testing against live ads.
- *
- * If the browser console shows "Refused to ... because it violates the
- * Content Security Policy", add exactly that host to the matching directive.
- * -------------------------------------------------------------------------- */
-const ADSTERRA = 'https://*.profitableratecpmnetwork.com https://bauval.org https://*.bauval.org https://show-sb.com https://*.show-sb.com https://cloudpiko.com https://*.cloudpiko.com';
+const ADSTERRA = 'https://*.profitableratecpmnetwork.com https://bauval.org https://*.bauval.org https://show-sb.com https://*.show-sb.com https://cloudpiko.com https://*.cloudpiko.com https://show-creative1.com https://*.show-creative1.com';
 const JSDELIVR = 'https://cdn.jsdelivr.net';
 const TESSDATA = 'https://tessdata.projectnaptha.com';
 const CDNJS = 'https://cdnjs.cloudflare.com';
@@ -51,10 +35,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  // Empty turbopack config so Next.js 16 accepts the custom webpack() below.
   turbopack: {},
   webpack: (config) => {
-    // pdfjs-dist and tesseract.js reference the optional node "canvas" package.
     config.resolve.alias.canvas = false;
     return config;
   },
