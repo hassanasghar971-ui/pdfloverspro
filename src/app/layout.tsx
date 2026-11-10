@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-// کلاؤڈ سونیٹ کی ہدایات کے مطابق صرف یہ امپورٹ لائن شامل کرنی ہے:
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 
 const inter = Inter({ subsets: ["latin"] });
@@ -19,9 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        {/* ویب سائٹ کا اصل ڈیزائن اور اسٹرکچر */}
         {children}
         
-        {/* کلاؤڈ سونیٹ کی ہدایت کے مطابق باڈی کے آخر میں یہ کمپوننٹ رکھنا ہے */}
+        {/* سروس ورکر رجسٹریشن جو آف لائن کیشنگ اور کارکردگی کو بہتر بناتا ہے */}
         <ServiceWorkerRegister />
       </body>
     </html>
