@@ -12,7 +12,6 @@ import {
 import { safeJson } from '@/lib/tool-view';
 import SocialBarGate from '@/components/SocialBarGate';
 import ConsentBanner, { CookieSettingsButton } from '@/components/ConsentBanner';
-import AdSlot from '@/components/AdSlot';
 import AdDiagnostic from '@/components/AdDiagnostic';
 
 const DEFAULT_TITLE = `${SITE.name}: ${TOOL_COUNT} Free PDF Tools in Your Browser`;
@@ -112,9 +111,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <main id="main" className="flex-1">
           {children}
         </main>
-
-        {/* Adsterra Native Banner AdSlot */}
-        <AdSlot className="mx-auto mt-12 max-w-5xl px-4" />
 
         <footer className="mt-16 border-t border-slate-200 bg-slate-50">
           <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-3">
