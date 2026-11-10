@@ -173,12 +173,36 @@ export function fileMatchesAccept(file: File, accept: readonly string[]): boolea
 }
 
 export async function readFileBytes(file: File | Blob): Promise<Uint8Array> {
-  try {
-    return new Uint8Array(await file.arrayBuffer());
-  } catch {
-    const name = 'name' in file ? `"${(file as File).name}"` : 'the file';
-    throw new ToolError(`Could not read ${name}. It may have been moved or deleted.`);
+  const attempts: Array<() => Promise<ArrayBuffer>> = [
+    () => file.arrayBuffer(),
+    () =>
+      new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (reader.result instanceof ArrayBuffer) resolve(reader.result);
+          else reject(new Error('Unexpected FileReader result.'));
+        };
+        reader.onerror = () => reject(reader.error ?? new Error('FileReader failed.'));
+        reader.readAsArrayBuffer(file);
+      }),
+    () => new Response(file).arrayBuffer(),
+  ];
+
+  for (let round = 0; round < 2; round++) {
+    if (round > 0) await new Promise<void>((resolve) => setTimeout(resolve, 250));
+    for (const attempt of attempts) {
+      try {
+        return new Uint8Array(await attempt());
+      } catch {
+        /* try the next method */
+      }
+    }
   }
+
+  const name = 'name' in file ? `"${(file as File).name}"` : 'the file';
+  throw new ToolError(
+    `Could not read ${name}. If it is stored in Google Photos or a cloud folder, download it to the phone first and pick it again.`,
+  );
 }
 
 /** Decode text bytes: UTF-16 BOMs, then strict UTF-8, then Windows-1252 as a fallback. */
