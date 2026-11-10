@@ -7,6 +7,7 @@
  * ========================================================================== */
 
 import { TOOL_CONTENT } from './tool-content';
+import { SITE_URL } from './site-url';
 
 /* --------------------------------- Types ---------------------------------- */
 
@@ -94,7 +95,7 @@ export interface Tool {
 export const SITE = {
   name: 'PDF Lovers Pro',
   shortName: 'PDF Lovers',
-  url: 'https://pdflovers.com',
+  url: SITE_URL,
   tagline: 'Free, private PDF tools that run entirely in your browser',
   description:
     'PDF Lovers Pro offers 42 free PDF tools (merge, split, compress, convert, edit, sign, OCR and more) that run 100% in your browser. Files are processed in your browser, not uploaded to our servers.',
@@ -1408,7 +1409,7 @@ const SPECS: Spec[] = [
       [`How is this different from Compare PDF?`, `This tool produces a written report covering structure and properties as well as text. Compare PDF can also create visual difference images.`],
       [`Can I leave out document properties?`, `Yes. Untick the properties option and the report covers pages, fonts and text only.`],
     ],
-    rel: ['compare-pdf', 'extract-fonts-pdf', 'pdf-to-txt'],
+    rel: ['compare-pdf', 'extract-images-pdf', 'pdf-to-txt'],
   },
   {
     slug: 'extract-images-pdf',
