@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import NativeBanner from '@/components/NativeBanner';
+import AdSlot from '@/components/AdSlot';
 import ToolCard from '@/components/ToolCard';
 import ToolRunner from '@/components/ToolRunner';
 import { SITE, buildToolJsonLd, getAllSlugs, getTool } from '@/lib/tools-registry';
@@ -23,10 +23,8 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
 
   const url = `${SITE.url}/tools/${tool.slug}`;
   const title = String(tool.metaTitle || `${tool.name} - Free Online`);
-  // The root layout appends " | PDF Lovers Pro"; skip it when the title already carries the brand.
   const hasBrand = /pdf lovers/i.test(title);
   const keywords = Array.isArray(tool.keywords) ? (tool.keywords as unknown[]).map(String) : undefined;
-  // Tools switched off in tool-availability.ts stay reachable but are kept out of search.
   const robots = isToolAvailable(tool.slug) ? undefined : { index: false, follow: true };
 
   return {
@@ -87,9 +85,7 @@ export default async function ToolPage({ params }: { params: Promise<Params> }) 
 
       <ToolRunner slug={tool.slug} />
 
-      <div className="my-10">
-        <NativeBanner />
-      </div>
+      <AdSlot className="my-10" />
 
       {sections.length > 0 && (
         <article className="seo-content">
