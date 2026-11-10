@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { downloadBlob, downloadResultFiles, formatBytes } from '@/lib/pdf-engine';
+import { downloadResultFiles, formatBytes } from '@/lib/pdf-engine';
 import type { ToolResult } from '@/lib/pdf-engine';
 
 const MAX_PREVIEWS = 12;
@@ -14,7 +14,7 @@ export interface ResultPanelProps {
 
 export default function ResultPanel({ result, zipName, onReset }: ResultPanelProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const [previews, setPreviews] = useState<Array<{ name: string; url: string }>>([]);
+  const [urls, setUrls] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const [copied, setCopied] = useState(false);
@@ -32,25 +32,23 @@ export default function ResultPanel({ result, zipName, onReset }: ResultPanelPro
     headingRef.current?.focus();
   }, []);
 
+  // One object URL per file, created after mount and revoked on reset/unmount.
   useEffect(() => {
-    const made = files
-      .filter((f) => f.mime.startsWith('image/'))
-      .slice(0, MAX_PREVIEWS)
-      .map((f) => ({ name: f.name, url: URL.createObjectURL(f.blob) }));
-    setPreviews(made);
+    const made = files.map((f) => URL.createObjectURL(f.blob));
+    setUrls(made);
     return () => {
-      for (const p of made) URL.revokeObjectURL(p.url);
+      for (const u of made) URL.revokeObjectURL(u);
     };
   }, [files]);
 
-  const saveOne = (i: number) => {
-    setProblem('');
-    try {
-      downloadBlob(files[i].blob, files[i].name);
-    } catch (e) {
-      setProblem(e instanceof Error ? e.message : 'The download could not be started.');
-    }
-  };
+  const ready = urls.length === files.length;
+
+  const previews = files
+    .map((f, i) => ({ name: f.name, mime: f.mime, url: urls[i] }))
+    .filter((p) => p.url && p.mime.startsWith('image/'))
+    .slice(0, MAX_PREVIEWS);
+
+  const imageCount = files.filter((f) => f.mime.startsWith('image/')).length;
 
   const saveAll = async () => {
     setProblem('');
@@ -96,15 +94,38 @@ export default function ResultPanel({ result, zipName, onReset }: ResultPanelPro
           <button type="button" className="btn btn-primary btn-lg" onClick={saveAll} disabled={busy}>
             {busy ? 'Building ZIP…' : `Download all (ZIP, ${files.length} files)`}
           </button>
-        ) : (
-          <button type="button" className="btn btn-primary btn-lg" onClick={() => saveOne(0)}>
+        ) : ready ? (
+          <a
+            className="btn btn-primary btn-lg text-center no-underline"
+            href={urls[0]}
+            download={files[0].name}
+          >
             Download {files[0].name}
+          </a>
+        ) : (
+          <button type="button" className="btn btn-primary btn-lg" disabled>
+            Preparing…
           </button>
         )}
         <button type="button" className="btn btn-secondary btn-lg" onClick={onReset}>
           Start over
         </button>
       </div>
+
+      {!multi && ready ? (
+        <p className="text-sm text-gray-600">
+          Nothing happened?{' '}
+          <a
+            className="font-semibold text-blue-700 underline"
+            href={urls[0]}
+            target="_blank"
+            rel="noopener"
+          >
+            Open the file in a new tab
+          </a>{' '}
+          and save it from there.
+        </p>
+      ) : null}
 
       {problem ? (
         <p role="alert" className="text-sm text-red-700">
@@ -122,9 +143,15 @@ export default function ResultPanel({ result, zipName, onReset }: ResultPanelPro
                 </span>
                 <span className="text-xs text-gray-500">{formatBytes(f.blob.size)}</span>
               </span>
-              <button type="button" className="btn btn-secondary shrink-0 text-sm" onClick={() => saveOne(i)}>
-                Download
-              </button>
+              {urls[i] ? (
+                <a
+                  className="btn btn-secondary shrink-0 text-sm no-underline"
+                  href={urls[i]}
+                  download={f.name}
+                >
+                  Download
+                </a>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -133,13 +160,13 @@ export default function ResultPanel({ result, zipName, onReset }: ResultPanelPro
       {previews.length > 0 && (
         <div>
           <p className="mb-2 text-sm font-semibold text-gray-700">
-            Preview{files.filter((f) => f.mime.startsWith('image/')).length > previews.length ? ` (first ${previews.length})` : ''}
+            Preview{imageCount > previews.length ? ` (first ${previews.length})` : ''}
           </p>
           <div className="flex flex-wrap gap-2">
-            {previews.map((p) => (
+            {previews.map((p, i) => (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                key={p.name}
+                key={`${p.name}-${i}`}
                 src={p.url}
                 alt={p.name}
                 loading="lazy"
