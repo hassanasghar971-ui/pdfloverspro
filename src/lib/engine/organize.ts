@@ -1,15 +1,4 @@
 // Organize tools: merge, split, rotate, crop, extract, delete, resize, n-up.
-//
-// All of these work on the PDF structure with pdf-lib (no rasterisation), so text,
-// vector graphics and fonts stay intact.
-//
-// Known limitations (by design of pdf-lib page copying):
-//  - Extract / Delete / Split / Merge copy pages into a fresh document. Page
-//    content, fonts, images and links to pages inside the copy are kept, but
-//    document-level structures (AcroForm fields, bookmarks/outlines, tagged
-//    structure) are not carried over.
-//  - Resize and N-up embed each source page as a form XObject. Visuals are exact,
-//    but links, form fields and other annotations on those pages are not kept.
 
 import { PDFDocument, degrees, rgb } from 'pdf-lib';
 import type { PDFEmbeddedPage, PDFPage } from 'pdf-lib';
@@ -39,6 +28,8 @@ import {
   progress,
   stem,
 } from './handler-utils';
+// نیا ورکر کلائنٹ امپورٹ (اگر فنکشن کا نام مختلف ہو تو یہاں تبدیل کریں)
+import { mergePdfs } from './merge-client';
 
 /* ------------------------------ helpers ------------------------------ */
 
@@ -79,12 +70,6 @@ function visualSize(page: PDFPage): { width: number; height: number; rotation: 0
   };
 }
 
-/**
- * Draws an embedded page inside `box`, honouring the source page's /Rotate.
- * With `fit` the page is scaled (aspect preserved) to the box; otherwise it is
- * drawn at 100% and centred (and may be clipped by the sheet edge).
- * Returns the rectangle actually covered.
- */
 function placeEmbedded(
   target: PDFPage,
   embedded: PDFEmbeddedPage,
@@ -101,7 +86,6 @@ function placeEmbedded(
   const ox = box.x + (box.width - dw) / 2;
   const oy = box.y + (box.height - dh) / 2;
 
-  // pdf-lib rotates counter-clockwise about (x, y); /Rotate is clockwise.
   let ax = ox;
   let ay = oy;
   if (rotation === 90) {
@@ -127,7 +111,6 @@ async function saveDoc(doc: PDFDocument): Promise<Uint8Array> {
   return savePdfBytes(doc, { objectStreams: true });
 }
 
-/** Copies the given zero-based pages of `src` into a new document. */
 async function copyInto(src: PDFDocument, indexes: number[]): Promise<PDFDocument> {
   const out = await PDFDocument.create();
   const copied = await out.copyPages(src, indexes);
@@ -139,31 +122,17 @@ async function copyInto(src: PDFDocument, indexes: number[]): Promise<PDFDocumen
 /* ------------------------------ handlers ----------------------------- */
 
 export const handlers: HandlerMap = {
-  /* ------------------------------ merge ------------------------------ */
+  /* ------------------------------ merge (Updated for Worker) ------------------------------ */
   'merge-pdf': async (ctx) => {
     const files = ctx.files;
-    const merged = await PDFDocument.create();
-    let pageCount = 0;
+    const result = await mergePdfs(files, {
+      signal: ctx.signal,
+      onProgress: (p, label) => progress(ctx, p, label || 'Merging PDFs'),
+    });
 
-    for (let i = 0; i < files.length; i += 1) {
-      throwIfAborted(ctx.signal);
-      const file = files[i];
-      progress(ctx, 4 + (i / files.length) * 86, `Merging ${file.name}`);
-      let bytes: Uint8Array | null = await bytesOf(file);
-      const src = await loadPdfLibDocument(bytes, { fileName: file.name });
-      bytes = null;
-      const copied = await merged.copyPages(src, src.getPageIndices());
-      for (const p of copied) merged.addPage(p);
-      pageCount += copied.length;
-      await yieldToMain();
-    }
-
-    setProducer(merged);
-    progress(ctx, 93, 'Saving merged PDF');
-    const out = await saveDoc(merged);
     return {
-      files: [pdfResultFile(out, 'merged.pdf')],
-      note: `Merged ${files.length} files into ${pageCount} pages (${formatBytes(out.length)}).`,
+      files: [pdfResultFile(result.bytes, 'merged.pdf')],
+      note: `Merged ${files.length} files into ${result.pageCount} pages (${formatBytes(result.bytes.length)}).`,
     };
   },
 
@@ -274,8 +243,6 @@ export const handlers: HandlerMap = {
       const visW = swap ? base.height : base.width;
       const visH = swap ? base.width : base.height;
 
-      // Margins are percentages of what the user SEES, so map the visual edges
-      // back to the unrotated page coordinate system.
       const vTop = (visH * top) / 100;
       const vBottom = (visH * bottom) / 100;
       const vLeft = (visW * left) / 100;
@@ -374,7 +341,7 @@ export const handlers: HandlerMap = {
     const file = ctx.files[0];
     const sizeKey = optStr(ctx.options, 'size', 'a4');
     const scaleContent = optFlag(ctx.options, 'scaleContent', true);
-    pageSizeFor(sizeKey, false); // validates the key before any work starts
+    pageSizeFor(sizeKey, false);
 
     progress(ctx, 4, 'Reading PDF');
     const src = await openSource(file);
@@ -385,7 +352,6 @@ export const handlers: HandlerMap = {
       throwIfAborted(ctx.signal);
       const sourcePage = pages[i];
       const vis = visualSize(sourcePage);
-      // Keep each page's orientation: landscape pages go on landscape sheets.
       const [tw, th] = pageSizeFor(sizeKey, vis.width > vis.height);
       const embedded = await embedWithBox(out, sourcePage);
       const target = out.addPage([tw, th]);
@@ -420,7 +386,7 @@ export const handlers: HandlerMap = {
     const orientation = optStr(ctx.options, 'orientation', 'auto');
     const landscape = orientation === 'auto' ? per === 2 || per === 6 : orientation === 'landscape';
     const [sheetW, sheetH] = pageSizeFor(optStr(ctx.options, 'pageSize', 'a4'), landscape);
-    const gap = clampNum(optNum(ctx.options, 'gap', 8), 0, 40); // points
+    const gap = clampNum(optNum(ctx.options, 'gap', 8), 0, 40);
     const border = optFlag(ctx.options, 'border', true);
 
     const base = per === 2 ? [2, 1] : per === 4 ? [2, 2] : per === 6 ? [3, 2] : [3, 3];
@@ -481,5 +447,4 @@ export const handlers: HandlerMap = {
   },
 };
 
-// Keep the type import used even if a future refactor drops direct references.
 export type OrganizeContext = RunContext;
