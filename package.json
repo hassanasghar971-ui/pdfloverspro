@@ -14,7 +14,7 @@
     "verify:content": "tsx scripts/verify-content.ts",
     "verify:engine": "tsx scripts/verify-engine.ts",
     "audit:master": "tsx scripts/master-audit.ts",
-    "audit:live": "tsx scripts/master-audit.ts --live https://pdflovers.com",
+    "audit:live": "tsx scripts/master-audit.ts --live https://pdfloverspro.vercel.app",
     "score": "tsx scripts/score-report.ts"
   },
   "dependencies": {
