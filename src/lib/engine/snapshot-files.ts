@@ -96,7 +96,7 @@ const MIME: Record<Exclude<Sniffed, 'heic' | 'unknown'>, string> = {
 function friendlyReason(error: unknown, name: string): string {
   const errName = error instanceof Error ? error.name : '';
   if (errName === 'NotReadableError' || errName === 'NotFoundError' || errName === 'SecurityError') {
-    return `"${name}" could not be read from your device. If it is stored in Google Photos or a cloud folder, download it to the phone first, or pick it again from the Gallery or Files app.`;
+    return `"${name}" could not be read from your device. If it is stored in Google Photos or a cloud folder, download it to the phone first, or pick it again from the Gallery or Files app.[span_1](start_span)[span_1](end_span)`;
   }
   return `"${name}" could not be read. Please pick the file again.`;
 }
