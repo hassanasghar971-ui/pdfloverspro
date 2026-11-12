@@ -1,13 +1,5 @@
 // Optimize tools: compress, repair, flatten, grayscale, invert colours,
 // remove annotations.
-//
-// Two techniques are used:
-//  1. Structural (pdf-lib): keeps text, links and vector graphics.
-//  2. Raster (pdf.js canvas -> JPEG -> pdf-lib): every page is re-drawn as a
-//     picture. This is what makes Compress (medium/high), Grayscale, Invert and
-//     "Full" Flatten work on any PDF, BUT the output text is no longer
-//     selectable or searchable, and links/forms are gone. Each handler says so
-//     in its result note.
 
 import { PDFContext, PDFDict, PDFDocument, PDFName, PDFRef } from 'pdf-lib';
 import type { PDFObject } from 'pdf-lib';
@@ -35,6 +27,8 @@ import {
   qualityOf,
   renderToCanvas,
 } from './handler-utils';
+// نیا کمپریشن ہیلپر امپورٹ (اگر فنکشن کا نام مختلف ہو تو یہاں تبدیل کریں)
+import { compressPdfWithHelper } from './compression-helper';
 
 /* ------------------------------ raster core -------------------------- */
 
@@ -47,7 +41,6 @@ interface RasterOptions {
   from: number;
   to: number;
   label: string;
-  /** Skip pages that fail to render instead of failing the whole job. */
   tolerant: boolean;
 }
 
@@ -57,7 +50,6 @@ interface RasterResult {
   failed: number;
 }
 
-/** Applies a grayscale/invert filter in horizontal strips to limit peak memory. */
 function applyFilter(canvas: HTMLCanvasElement, filter: RasterFilter): void {
   if (filter === 'none') return;
   const g = canvas.getContext('2d', { willReadFrequently: true });
@@ -212,13 +204,12 @@ function subtypeOf(dict: PDFDict): string {
 }
 
 function shouldRemove(subtype: string, mode: string): boolean {
-  if (subtype === 'Widget') return false; // form fields are never removed here
+  if (subtype === 'Widget') return false;
   if (mode === 'links') return subtype === 'Link';
   if (mode === 'markup') return MARKUP_SUBTYPES.has(subtype);
-  return true; // 'all'
+  return true;
 }
 
-/** Collects indirect references to an annotation's appearance streams. */
 function appearanceRefs(dict: PDFDict, context: PDFContext): PDFRef[] {
   const refs: PDFRef[] = [];
   const addEntries = (d: PDFDict) => {
@@ -287,11 +278,11 @@ async function rebuildWithPdfLib(bytes: Uint8Array): Promise<Rebuilt> {
 /* ------------------------------ handlers ----------------------------- */
 
 export const handlers: HandlerMap = {
-  /* ----------------------------- compress ---------------------------- */
+  /* ----------------------------- compress (Updated with Helper) ---------------------------- */
   'compress-pdf': async (ctx, mem) => {
     const file = ctx.files[0];
     const level = optStr(ctx.options, 'level', 'medium');
-    const preset = COMPRESS_PRESETS[level]; // undefined for "low"
+    const preset = COMPRESS_PRESETS[level];
 
     progress(ctx, 4, 'Reading PDF');
     const original = await bytesOf(file);
@@ -299,7 +290,7 @@ export const handlers: HandlerMap = {
     let best: Uint8Array | null = null;
     let method: 'structure' | 'raster' | '' = '';
 
-    // Pass 1: lossless structural re-save (keeps text, links, forms).
+    // Pass 1: lossless structural re-save
     progress(ctx, 8, 'Optimizing structure');
     try {
       const doc = await loadPdfLibDocument(original, { fileName: file.name });
@@ -310,23 +301,19 @@ export const handlers: HandlerMap = {
       }
     } catch (e) {
       if (level === 'low' || isPasswordError(e)) throw e;
-      // For medium/high the raster pass below can still handle this file.
     }
 
-    // Pass 2: raster re-encode (medium/high only).
+    // Pass 2: delegated to new compression-helper
     if (preset) {
-      const raster = await rasterizeToPdf(ctx, mem, file, original, {
+      const compressed = await compressPdfWithHelper(ctx, mem, file, original, {
         scale: preset.scale,
         quality: preset.quality,
-        filter: 'none',
         from: 15,
         to: 94,
-        label: 'Compressing pages',
-        tolerant: false,
       });
       const currentBest = best ? best.length : original.length;
-      if (raster.bytes.length < currentBest) {
-        best = raster.bytes;
+      if (compressed.length < currentBest) {
+        best = compressed;
         method = 'raster';
       }
     }
@@ -356,7 +343,6 @@ export const handlers: HandlerMap = {
     progress(ctx, 4, 'Reading PDF');
     const bytes = await bytesOf(file);
 
-    // Strategy 1: rebuild the file structure with pdf-lib and verify with pdf.js.
     progress(ctx, 10, 'Rebuilding file structure');
     let rebuilt: Rebuilt | null = null;
     try {
@@ -395,7 +381,6 @@ export const handlers: HandlerMap = {
       };
     }
 
-    // Strategy 2: pdf.js has a far more forgiving parser. Re-render what it can read.
     progress(ctx, 45, 'Structure is too damaged, re-rendering readable pages');
     const raster = await rasterizeToPdf(ctx, mem, file, bytes, {
       scale: 2,
@@ -443,7 +428,6 @@ export const handlers: HandlerMap = {
       };
     }
 
-    // Forms mode: bake fillable fields into the page content, keep text selectable.
     const openForm = async () => {
       const doc = await loadPdfLibDocument(bytes, { fileName: file.name });
       return { doc, form: doc.getForm() };
@@ -467,8 +451,6 @@ export const handlers: HandlerMap = {
         first.form.flatten();
         doc = first.doc;
       } catch {
-        // Some fields use characters the standard fonts cannot draw. Retry with
-        // the PDF's own stored appearances instead of regenerating them.
         const second = await openForm();
         second.form.flatten({ updateFieldAppearances: false });
         doc = second.doc;
@@ -519,8 +501,6 @@ export const handlers: HandlerMap = {
             continue;
           }
           removed += 1;
-          // Delete the objects themselves (not just the page's reference) so the
-          // comment text and appearance streams do not linger in the saved file.
           for (const ref of appearanceRefs(dict, context)) context.delete(ref);
           if (raw instanceof PDFRef) context.delete(raw);
         }
