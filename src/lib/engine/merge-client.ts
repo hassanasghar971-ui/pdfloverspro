@@ -33,7 +33,12 @@ export async function mergePdfs(
         () => new Worker(new URL('../../workers/merge.worker.ts', import.meta.url), { type: 'module' }),
         { names: inputs.map((f) => f.name), buffers },
         buffers as Transferable[],
-        { signal: options.signal, onProgress: options.onProgress },
+        {
+          signal: options.signal,
+          onProgress: (p, label) => {
+            options.onProgress?.(p, label ?? 'Processing');
+          },
+        },
       );
       return { bytes, via: 'worker' };
     } catch (err) {
@@ -43,7 +48,9 @@ export async function mergePdfs(
 
   const bytes = await mergePdfBytes(
     inputs.map((f) => ({ name: f.name, bytes: f.bytes })),
-    options.onProgress,
+    (p, label) => {
+      options.onProgress?.(p, label);
+    },
   );
   return { bytes, via: 'main-thread' };
 }
