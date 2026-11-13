@@ -1,11 +1,10 @@
-import type { MetadataRoute } from "next";
-import { getAvailableToolSlugs } from "@/lib/tool-availability";
-import { LEGAL_PAGES } from "@/lib/tools-registry";
-import { SITE_URL } from "@/lib/site-url";
+import type { MetadataRoute } from 'next';
+import { getAvailableToolSlugs } from '@/lib/tool-availability';
+import { LEGAL_PAGES } from '@/lib/tools-registry';
 
-export const dynamic = "force-static";
+export const dynamic = 'force-static';
 
-const BASE_URL = SITE_URL;
+const BASE_URL = 'https://pdfloverspro.vercel.app';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const home: MetadataRoute.Sitemap = [{ url: BASE_URL }];
