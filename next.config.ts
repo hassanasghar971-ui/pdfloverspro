@@ -1,18 +1,21 @@
 import type { NextConfig } from 'next';
 
-const ADSTERRA = 'https://*.profitableratecpmnetwork.com https://bauval.org https://*.bauval.org https://show-sb.com https://*.show-sb.com https://cloudpiko.com https://*.cloudpiko.com https://show-creative1.com https://*.show-creative1.com';
+const ADSTERRA =
+  'https://*.profitableratecpmnetwork.com https://bauval.org https://*.bauval.org https://show-sb.com https://*.show-sb.com https://cloudpiko.com https://*.cloudpiko.com https://*.highperformanceformat.com https://*.thewhizmarketing.com https://*.adcash.com';
+const GOOGLE_ADS =
+  'https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.googleadservices.com https://*.doubleclick.net';
 const JSDELIVR = 'https://cdn.jsdelivr.net';
 const TESSDATA = 'https://tessdata.projectnaptha.com';
 const CDNJS = 'https://cdnjs.cloudflare.com';
 
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${ADSTERRA} ${JSDELIVR}`,
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${ADSTERRA} ${GOOGLE_ADS} ${JSDELIVR}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data: blob: https:",
+  `img-src 'self' data: blob: https:`,
   "font-src 'self' https://fonts.gstatic.com data:",
-  `connect-src 'self' blob: ${ADSTERRA} ${JSDELIVR} ${TESSDATA} ${CDNJS}`,
-  `frame-src 'self' ${ADSTERRA}`,
+  `connect-src 'self' blob: ${ADSTERRA} ${GOOGLE_ADS} ${JSDELIVR} ${TESSDATA} ${CDNJS}`,
+  `frame-src 'self' ${ADSTERRA} ${GOOGLE_ADS}`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",

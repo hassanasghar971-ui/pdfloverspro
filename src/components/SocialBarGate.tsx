@@ -1,87 +1,86 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { adsAllowed, CONSENT_CHANGED_EVENT } from '@/lib/consent';
 import {
   GATED_SCRIPTS,
-  adsDebug,
-  bumpCount,
   injectScript,
-  readCount,
   removeScript,
-  whenIdle,
 } from '@/lib/ads';
-import AdsDebugPanel from '@/components/AdsDebugPanel';
+
+const ADSENSE_SCRIPT_ID = 'google-adsense-client';
+const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_CLIENT?.trim();
+const ADSENSE_SCRIPT_URL = ADSENSE_CLIENT
+  ? `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(ADSENSE_CLIENT)}`
+  : null;
 
 export default function SocialBarGate() {
   useEffect(() => {
     let interactions = 0;
-    const loaded = new Set<string>();
-    const pending = new Set<string>();
+    let pending = false;
+    let loaded = false;
 
-    const tryLoad = () => {
+    const syncAdSense = () => {
       if (!adsAllowed()) {
-        adsDebug('social bar: ads not allowed (consent / region / GPC)');
+        removeScript(ADSENSE_SCRIPT_ID);
         return;
       }
-      if (document.visibilityState !== 'visible') {
-        adsDebug('social bar: tab not visible');
-        return;
+      if (ADSENSE_SCRIPT_URL && !document.getElementById(ADSENSE_SCRIPT_ID)) {
+        const script = injectScript(ADSENSE_SCRIPT_ID, ADSENSE_SCRIPT_URL);
+        script?.setAttribute('crossorigin', 'anonymous');
       }
-      for (const s of GATED_SCRIPTS) {
-        if (loaded.has(s.id) || pending.has(s.id)) continue;
-        if (interactions < s.interactionsNeeded) {
-          adsDebug(`social bar: waiting for interactions (${interactions}/${s.interactionsNeeded})`);
-          continue;
-        }
-        if (readCount(s.countKey) >= s.maxLoads) {
-          adsDebug('social bar: session cap reached for', s.id);
-          continue;
-        }
-        pending.add(s.id);
-        whenIdle(() => {
-          pending.delete(s.id);
-          if (!adsAllowed()) return;
-          injectScript(s.id, s.src);
-          bumpCount(s.countKey);
-          loaded.add(s.id);
-        });
+    };
+
+    const tryLoadAdsterraSocial = () => {
+      if (!adsAllowed() || loaded || pending || interactions < 2) return;
+      pending = true;
+      const load = () => {
+        pending = false;
+        if (!adsAllowed() || loaded) return;
+        const script = GATED_SCRIPTS[0];
+        if (!script) return;
+        injectScript(script.id, script.src);
+        loaded = true;
+      };
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(load, { timeout: 2000 });
+      } else {
+        window.setTimeout(load, 0);
       }
     };
 
     const onInteraction = () => {
       interactions += 1;
-      tryLoad();
-    };
-    const onAction = () => {
-      interactions = Math.max(interactions, 2);
-      tryLoad();
+      tryLoadAdsterraSocial();
     };
     const onConsent = () => {
       if (!adsAllowed()) {
-        for (const s of GATED_SCRIPTS) removeScript(s.id);
-        loaded.clear();
-        pending.clear();
-        adsDebug('social bar: consent withdrawn, script removed (reload to remove the bar itself)');
+        for (const script of GATED_SCRIPTS) removeScript(script.id);
+        loaded = false;
+        pending = false;
       } else {
-        tryLoad();
+        syncAdSense();
+        tryLoadAdsterraSocial();
       }
     };
 
+    syncAdSense();
     window.addEventListener('pointerdown', onInteraction, { passive: true });
     window.addEventListener('keydown', onInteraction);
-    window.addEventListener('plp:action', onAction);
     window.addEventListener(CONSENT_CHANGED_EVENT, onConsent);
-    document.addEventListener('visibilitychange', tryLoad);
+    window.addEventListener('storage', onConsent);
 
     return () => {
       window.removeEventListener('pointerdown', onInteraction);
       window.removeEventListener('keydown', onInteraction);
-      window.removeEventListener('plp:action', onAction);
       window.removeEventListener(CONSENT_CHANGED_EVENT, onConsent);
-      document.removeEventListener('visibilitychange', tryLoad);
+      window.removeEventListener('storage', onConsent);
+      if (!adsAllowed()) {
+        removeScript(ADSENSE_SCRIPT_ID);
+        for (const script of GATED_SCRIPTS) removeScript(script.id);
+      }
     };
   }, []);
 
-  return <AdsDebugPanel />;
+  return null;
 }
