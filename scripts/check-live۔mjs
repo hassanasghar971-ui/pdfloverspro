@@ -1,4 +1,4 @@
-const base = (process.argv[2] || 'https://pdflovers-rouge.vercel.app').replace(/\/$/, '');
+const base = (process.argv[2] || 'https://pdfloverspro.vercel.app').replace(/\/$/, '');
 let bad = 0;
 
 const get = async (path) => {
@@ -13,10 +13,22 @@ const check = (label, ok, detail = '') => {
 /* sitemap */
 const sm = await get('/sitemap.xml');
 const locs = [...sm.text.matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]);
+check('sitemap responds successfully', sm.status === 200, `HTTP ${sm.status}`);
 check('sitemap has 46 URLs', locs.length === 46, `found ${locs.length}`);
 check('no /tools/<number> URLs', !locs.some((u) => /\/tools\/\d/.test(u)));
-check('protect-pdf / unlock-pdf not in sitemap', !locs.some((u) => /protect-pdf|unlock-pdf/.test(u)));
-check('all URLs start with https://pdflovers.com', locs.every((u) => u.startsWith('https://pdflovers.com')));
+check('disabled protect-pdf / unlock-pdf are not in sitemap', !locs.some((u) => /protect-pdf|unlock-pdf/.test(u)));
+check(
+  'all sitemap URLs use the canonical Vercel host',
+  locs.every((u) => u.startsWith('https://pdfloverspro.vercel.app/')),
+);
+
+/* robots sitemap URL */
+const robots = await get('/robots.txt');
+check('robots.txt responds successfully', robots.status === 200, `HTTP ${robots.status}`);
+check(
+  'robots.txt points at the canonical sitemap',
+  robots.text.includes('Sitemap: https://pdfloverspro.vercel.app/sitemap.xml'),
+);
 
 /* robots meta on tool pages */
 const robotsOf = (html) => (html.match(/<meta name="robots" content="([^"]*)"/) || [])[1] || '(none)';
@@ -38,13 +50,7 @@ check('cards no longer repeat "Free, private, no upload"', suffixCount === 0, `f
 for (const p of ['privacy-policy', 'contact-us', 'about-us', 'terms-and-conditions', 'dmca-notice']) {
   const r = await get('/' + p);
   const canon = (r.text.match(/<link rel="canonical" href="([^"]*)"/) || [])[1] || '(none)';
-  check(`${p}: canonical is its own URL`, canon.endsWith('/' + p), canon);
-}
-
-/* brand assets (informational) */
-console.log('\nBrand assets:');
-for (const p of ['favicon.ico', 'icon.svg', 'apple-icon.png', 'icons/icon-512.png', 'opengraph-image.png', 'twitter-image.png']) {
-  console.log(`  ${p} -> ${(await get('/' + p)).status}`);
+  check(`${p}: canonical is on the canonical host`, canon.startsWith(`https://pdfloverspro.vercel.app/${p}`), canon);
 }
 
 console.log(bad ? `\n${bad} check(s) failed.` : '\nAll checks passed.');
