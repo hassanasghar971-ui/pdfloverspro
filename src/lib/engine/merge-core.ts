@@ -29,8 +29,7 @@ export async function mergePdfBytes(inputs: MergeInput[], onProgress?: MergeProg
       throw new Error(`"${input.name}" could not be read. It may be damaged or not a real PDF.`);
     }
 
-    const count = src.getPageCount();
-    if (count === 0) throw new Error(`"${input.name}" has no pages.`);
+    if (src.getPageCount() === 0) throw new Error(`"${input.name}" has no pages.`);
 
     const pages = await out.copyPages(src, src.getPageIndices());
     for (const page of pages) out.addPage(page);
