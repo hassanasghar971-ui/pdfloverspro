@@ -85,7 +85,7 @@ export default async function ToolPage({ params }: { params: Promise<Params> }) 
       <header className="mb-6">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{tool.h1 || tool.name}</h1>
         <p className="mt-2 text-lg text-gray-700">
-          {available ? tool.metaDescription : 'This tool is not available yet.'}
+          {available ? tool.metaDescription : 'This tool is temporarily unavailable due to browser engine limitations.'}
         </p>
       </header>
 
@@ -96,11 +96,11 @@ export default async function ToolPage({ params }: { params: Promise<Params> }) 
         </>
       ) : (
         <div role="status" className="card p-5">
-          <p className="font-semibold">{tool.name} is not available at the moment.</p>
+          <p className="font-semibold">{tool.name} is temporarily unavailable.</p>
           <p className="mt-2 text-gray-700">
-            The browser engine we use does not support this feature safely yet, so we have switched it off instead of
-            giving you a file that does not work. Your files were not opened or uploaded. Please try one of the other
-            tools below.
+            The browser engine we use does not support this feature safely yet, so we have temporarily switched it off
+            rather than return a file that may not work. Your files were not opened or uploaded. Please try one of the
+            other tools below.
           </p>
           <p className="mt-3">
             <Link href="/#all-tools" className="font-semibold text-brand-600 hover:underline">
