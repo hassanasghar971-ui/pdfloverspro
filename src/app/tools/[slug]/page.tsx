@@ -43,20 +43,24 @@ export default async function ToolPage({ params }: { params: Promise<Params> }) 
   const tool = getTool(slug);
   if (!tool) notFound();
 
+  const available = isToolAvailable(tool.slug);
+
   if (process.env.NODE_ENV !== 'production') {
     const gaps = contentGaps(tool);
     if (gaps.length > 0) console.warn(`[tool page] ${tool.slug}: ${gaps.join(', ')}`);
   }
 
   const category = categoryInfo(String(tool.category));
-  const sections = getSections(tool);
-  const steps = getSteps(tool);
-  const faqs = getFaqs(tool);
+  const sections = available ? getSections(tool) : [];
+  const steps = available ? getSteps(tool) : [];
+  const faqs = available ? getFaqs(tool) : [];
   const related = getRelated(tool).map(toCard);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:py-10">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJson(buildToolJsonLd(tool)) }} />
+      {available ? (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJson(buildToolJsonLd(tool)) }} />
+      ) : null}
 
       <nav aria-label="Breadcrumb" className="mb-4 text-sm text-gray-600">
         <ol className="flex flex-wrap items-center gap-1.5">
@@ -80,12 +84,31 @@ export default async function ToolPage({ params }: { params: Promise<Params> }) 
 
       <header className="mb-6">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{tool.h1 || tool.name}</h1>
-        <p className="mt-2 text-lg text-gray-700">{tool.metaDescription}</p>
+        <p className="mt-2 text-lg text-gray-700">
+          {available ? tool.metaDescription : 'This tool is not available yet.'}
+        </p>
       </header>
 
-      <ToolRunner slug={tool.slug} />
-
-      <AdSlot className="my-10" />
+      {available ? (
+        <>
+          <ToolRunner slug={tool.slug} />
+          <AdSlot className="my-10" />
+        </>
+      ) : (
+        <div role="status" className="card p-5">
+          <p className="font-semibold">{tool.name} is not available at the moment.</p>
+          <p className="mt-2 text-gray-700">
+            The browser engine we use does not support this feature safely yet, so we have switched it off instead of
+            giving you a file that does not work. Your files were not opened or uploaded. Please try one of the other
+            tools below.
+          </p>
+          <p className="mt-3">
+            <Link href="/#all-tools" className="font-semibold text-brand-600 hover:underline">
+              Browse all available tools
+            </Link>
+          </p>
+        </div>
+      )}
 
       {sections.length > 0 && (
         <article className="seo-content">
