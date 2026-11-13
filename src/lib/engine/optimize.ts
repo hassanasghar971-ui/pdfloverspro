@@ -27,8 +27,8 @@ import {
   qualityOf,
   renderToCanvas,
 } from './handler-utils';
-// نیا کمپریشن ہیلپر امپورٹ (اگر فنکشن کا نام مختلف ہو تو یہاں تبدیل کریں)
-import { compressPdfWithHelper } from './compression-helper';
+// اپ ڈیٹ شدہ کمپریشن ہیلپر امپورٹ
+import { compressPdf } from './compression-helper';
 
 /* ------------------------------ raster core -------------------------- */
 
@@ -143,9 +143,10 @@ function sizeChange(before: number, after: number): string {
 
 /* ------------------------------ compress ----------------------------- */
 
-const COMPRESS_PRESETS: Record<string, { scale: number; quality: number; summary: string }> = {
-  medium: { scale: 1.5, quality: 0.7, summary: 'about 108 dpi, JPEG quality 70' },
-  high: { scale: 1.0, quality: 0.5, summary: 'about 72 dpi, JPEG quality 50' },
+const COMPRESS_PRESETS: Record<string, { level: 'low' | 'medium' | 'high'; summary: string }> = {
+  low: { level: 'low', summary: 'light image optimization' },
+  medium: { level: 'medium', summary: 'balanced compression' },
+  high: { level: 'high', summary: 'maximum compression with raster fallback' },
 };
 
 /* ------------------- grayscale / invert handler factory -------------- */
@@ -279,46 +280,24 @@ async function rebuildWithPdfLib(bytes: Uint8Array): Promise<Rebuilt> {
 
 export const handlers: HandlerMap = {
   /* ----------------------------- compress (Updated with Helper) ---------------------------- */
-  'compress-pdf': async (ctx, mem) => {
+  'compress-pdf': async (ctx) => {
     const file = ctx.files[0];
-    const level = optStr(ctx.options, 'level', 'medium');
-    const preset = COMPRESS_PRESETS[level];
+    const levelKey = optStr(ctx.options, 'level', 'medium');
+    const preset = COMPRESS_PRESETS[levelKey] || COMPRESS_PRESETS['medium'];
 
     progress(ctx, 4, 'Reading PDF');
     const original = await bytesOf(file);
 
-    let best: Uint8Array | null = null;
-    let method: 'structure' | 'raster' | '' = '';
+    progress(ctx, 10, 'Optimizing PDF');
+    const result = await compressPdf(original, {
+      level: preset.level,
+      signal: ctx.signal,
+      onProgress: (fraction, label) => {
+        progress(ctx, 10 + fraction * 84, label || 'Compressing PDF');
+      },
+    });
 
-    // Pass 1: lossless structural re-save
-    progress(ctx, 8, 'Optimizing structure');
-    try {
-      const doc = await loadPdfLibDocument(original, { fileName: file.name });
-      const saved = await savePdfBytes(doc, { objectStreams: true });
-      if (saved.length < original.length) {
-        best = saved;
-        method = 'structure';
-      }
-    } catch (e) {
-      if (level === 'low' || isPasswordError(e)) throw e;
-    }
-
-    // Pass 2: delegated to new compression-helper
-    if (preset) {
-      const compressed = await compressPdfWithHelper(ctx, mem, file, original, {
-        scale: preset.scale,
-        quality: preset.quality,
-        from: 15,
-        to: 94,
-      });
-      const currentBest = best ? best.length : original.length;
-      if (compressed.length < currentBest) {
-        best = compressed;
-        method = 'raster';
-      }
-    }
-
-    if (!best) {
+    if (result.method === 'unchanged' || result.bytes.length >= original.length) {
       return {
         files: [pdfResultFile(original, pdfFileName(file, 'compressed'))],
         note:
@@ -328,12 +307,13 @@ export const handlers: HandlerMap = {
     }
 
     const detail =
-      method === 'raster' && preset
-        ? ` Pages were re-rendered as images (${preset.summary}), so text is no longer selectable or searchable.`
-        : ' Text, links and forms were kept (lossless optimization only).';
+      result.method === 'raster'
+        ? ' Pages were converted to images to reach this size. Text in the result can no longer be selected or searched.'
+        : ` ${result.imagesRecompressed} of ${result.imagesSeen} large images were re-compressed. Text is unchanged.`;
+
     return {
-      files: [pdfResultFile(best, pdfFileName(file, 'compressed'))],
-      note: `${sizeChange(original.length, best.length)}.${detail}`,
+      files: [pdfResultFile(result.bytes, pdfFileName(file, 'compressed'))],
+      note: `${sizeChange(original.length, result.bytes.length)}.${detail} Processed via: ${result.method}`,
     };
   },
 
