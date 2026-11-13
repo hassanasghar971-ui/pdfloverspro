@@ -164,7 +164,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               {SITE.whatsappPrimary && (
                 <p className="mt-1 text-sm">
                   <a
-                    href={`https://wa.me/${SITE.whatsappPrimary.replace(/[^0-9]/g, '')}`}
+                    href={SITE.whatsappPrimaryLink}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-slate-700 hover:text-brand-600"
@@ -176,7 +176,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               {SITE.whatsappSecondary && (
                 <p className="mt-1 text-sm">
                   <a
-                    href={`https://wa.me/${SITE.whatsappSecondary.replace(/[^0-9]/g, '')}`}
+                    href={SITE.whatsappSecondaryLink}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-slate-700 hover:text-brand-600"
