@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { adsAllowed, CONSENT_CHANGED_EVENT } from '@/lib/consent';
 import {
   GATED_SCRIPTS,
@@ -42,8 +42,10 @@ export default function SocialBarGate() {
         injectScript(script.id, script.src);
         loaded = true;
       };
-      if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(load, { timeout: 2000 });
+
+      const requestIdleCallback = window.requestIdleCallback;
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback.call(window, load, { timeout: 2000 });
       } else {
         window.setTimeout(load, 0);
       }
@@ -53,6 +55,7 @@ export default function SocialBarGate() {
       interactions += 1;
       tryLoadAdsterraSocial();
     };
+
     const onConsent = () => {
       if (!adsAllowed()) {
         for (const script of GATED_SCRIPTS) removeScript(script.id);
