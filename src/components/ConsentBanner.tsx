@@ -6,6 +6,7 @@ import {
   CONSENT_OPEN_EVENT,
   getDecision,
   hasGpc,
+  resolveMode,
   setDecision,
   type ConsentValue,
 } from '@/lib/consent';
@@ -27,11 +28,23 @@ export default function ConsentBanner() {
   const [gpc, setGpc] = useState(false);
 
   useEffect(() => {
+    let active = true;
+
     setGpc(hasGpc());
-    setOpen(getDecision() === null);
+
+    void resolveMode().then((mode) => {
+      if (active && mode === 'opt-in' && getDecision() === null) {
+        setOpen(true);
+      }
+    });
+
     const onOpen = () => setOpen(true);
     window.addEventListener(CONSENT_OPEN_EVENT, onOpen);
-    return () => window.removeEventListener(CONSENT_OPEN_EVENT, onOpen);
+
+    return () => {
+      active = false;
+      window.removeEventListener(CONSENT_OPEN_EVENT, onOpen);
+    };
   }, []);
 
   const choose = useCallback((value: ConsentValue) => {
@@ -60,9 +73,9 @@ export default function ConsentBanner() {
           <p id="plp-consent-text" className="mt-1 text-sm leading-relaxed text-slate-600">
             Our PDF tools run 100% locally in your browser; your documents are not uploaded to our
             servers. Non-intrusive advertising helps keep the tools free and unlimited. Adsterra and,
-            when configured, Google AdSense may use cookies or similar technologies. No advertising
-            scripts load unless you choose to accept. You can change your choice any time in Cookie
-            settings.{gpc ? ' Your browser also sends a Global Privacy Control signal.' : ''}{' '}
+            when configured, Google AdSense may use cookies or similar technologies. In this region,
+            ads load only if you accept. You can change your choice any time in Cookie settings.
+            {gpc ? ' Your browser also sends a Global Privacy Control signal.' : ''}{' '}
             See our{' '}
             <Link href="/privacy-policy" className="font-medium text-slate-900 underline">
               Privacy Policy
@@ -70,6 +83,7 @@ export default function ConsentBanner() {
             .
           </p>
         </div>
+
         <div className="flex flex-col-reverse items-center gap-2 sm:flex-row sm:gap-3">
           <button
             type="button"
