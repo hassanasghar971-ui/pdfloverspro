@@ -1,21 +1,30 @@
 import type { MetadataRoute } from 'next';
-import { getAvailableToolSlugs } from '@/lib/tool-availability';
-import { LEGAL_PAGES } from '@/lib/tools-registry';
+import { getAllSlugs } from '@/lib/tools-registry';
+import { isToolAvailable } from '@/lib/tool-availability';
+import { SITE_URL } from '@/lib/site-url';
 
 export const dynamic = 'force-static';
 
-const BASE_URL = 'https://pdfloverspro.vercel.app';
+const LEGAL_PATHS = [
+  '/about-us',
+  '/contact-us',
+  '/privacy-policy',
+  '/terms-and-conditions',
+  '/dmca-notice',
+];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const home: MetadataRoute.Sitemap = [{ url: BASE_URL }];
+  const base = SITE_URL.replace(/\/+$/, '');
 
-  const toolPages: MetadataRoute.Sitemap = getAvailableToolSlugs().map((slug) => ({
-    url: `${BASE_URL}/tools/${slug}`,
-  }));
+  const toolUrls = getAllSlugs()
+    .filter((slug: string) => isToolAvailable(slug))
+    .map((slug: string) => `${base}/tools/${slug}`);
 
-  const legalPages: MetadataRoute.Sitemap = LEGAL_PAGES.map(({ slug }) => ({
-    url: `${BASE_URL}/${slug}`,
-  }));
+  const urls = [
+    `${base}/`,
+    ...toolUrls,
+    ...LEGAL_PATHS.map((path) => `${base}${path}`),
+  ];
 
-  return [...home, ...toolPages, ...legalPages];
+  return Array.from(new Set(urls)).map((url) => ({ url }));
 }
