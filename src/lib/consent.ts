@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 
 export type ConsentValue = 'granted' | 'denied';
-
-/** Retained for compatibility with callers; ads always require explicit opt-in. */
 export type ConsentMode = 'opt-in' | 'opt-out';
 
 const DECISION_KEY = 'plp_consent_v1';
+const MODE_KEY = 'plp_region_mode_v1';
 const MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
 export const CONSENT_CHANGED_EVENT = 'plp:consent';
 export const CONSENT_OPEN_EVENT = 'plp:consent-open';
+
+let cachedMode: ConsentMode | null = null;
+let modePromise: Promise<ConsentMode> | null = null;
 
 function emit(): void {
   if (typeof window !== 'undefined') {
@@ -17,10 +19,6 @@ function emit(): void {
   }
 }
 
-/**
- * Returns only a valid, unexpired choice stored in localStorage.
- * Missing, malformed, expired, or inaccessible storage always means no consent.
- */
 export function getDecision(): ConsentValue | null {
   if (typeof window === 'undefined') return null;
 
@@ -47,15 +45,11 @@ export function getDecision(): ConsentValue | null {
 
     return record.value;
   } catch {
-    // Fail closed if storage is blocked or the saved value cannot be read.
+    // Missing or inaccessible storage never counts as consent.
     return null;
   }
 }
 
-/**
- * Saves the visitor's choice. If storage is unavailable, the choice is not
- * treated as persistent consent and ads remain disabled.
- */
 export function setDecision(value: ConsentValue): void {
   if (typeof window === 'undefined') return;
 
@@ -65,7 +59,7 @@ export function setDecision(value: ConsentValue): void {
       JSON.stringify({ value, ts: Date.now() }),
     );
   } catch {
-    // Fail closed: adsAllowed() requires a readable stored affirmative choice.
+    // If consent cannot be stored, adsAllowed() will fail closed.
   }
 
   emit();
@@ -80,19 +74,87 @@ export function hasGpc(): boolean {
   );
 }
 
-/** Compatibility helper; region classification never grants ad consent. */
-export function getMode(): ConsentMode {
-  return 'opt-in';
+export function getMode(): ConsentMode | null {
+  if (typeof window === 'undefined') return null;
+  if (cachedMode) return cachedMode;
+
+  try {
+    const stored = window.sessionStorage.getItem(MODE_KEY);
+    if (stored === 'opt-in' || stored === 'opt-out') {
+      cachedMode = stored;
+      return stored;
+    }
+  } catch {
+    // No stored region decision; resolve it below.
+  }
+
+  return null;
 }
 
-/** Compatibility helper; does not make a network request or affect consent. */
+/**
+ * Resolves the regional banner policy. Any network, response, or parsing
+ * failure uses opt-in: the banner is shown and ads remain blocked.
+ */
 export function resolveMode(): Promise<ConsentMode> {
-  return Promise.resolve('opt-in');
+  const knownMode = getMode();
+  if (knownMode) return Promise.resolve(knownMode);
+  if (modePromise) return modePromise;
+
+  modePromise = (async () => {
+    let mode: ConsentMode = 'opt-in';
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 4000);
+
+    try {
+      const response = await fetch('/api/region', {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as { mode?: unknown };
+        if (data.mode === 'opt-in' || data.mode === 'opt-out') {
+          mode = data.mode;
+        }
+      }
+    } catch {
+      // Keep the safer opt-in default.
+    } finally {
+      window.clearTimeout(timeout);
+    }
+
+    cachedMode = mode;
+
+    try {
+      window.sessionStorage.setItem(MODE_KEY, mode);
+    } catch {
+      // Keep the in-memory mode for this page view.
+    }
+
+    emit();
+    return mode;
+  })();
+
+  return modePromise;
 }
 
-/** Ads are allowed only after an affirmative choice has been stored. */
+/**
+ * EU/selected-state opt-in: requires an explicit stored grant.
+ * Other regions: ads may load by default, unless the visitor rejected or
+ * their browser sends Global Privacy Control.
+ * Unknown region: fail closed until the region check resolves.
+ */
 export function adsAllowed(): boolean {
-  return typeof window !== 'undefined' && getDecision() === 'granted';
+  if (typeof window === 'undefined') return false;
+
+  const mode = getMode();
+  if (!mode || hasGpc()) return false;
+
+  const decision = getDecision();
+  if (decision === 'denied') return false;
+  if (mode === 'opt-in') return decision === 'granted';
+
+  return true;
 }
 
 export function useAdsAllowed(): boolean {
@@ -102,6 +164,7 @@ export function useAdsAllowed(): boolean {
     const update = () => setAllowed(adsAllowed());
 
     update();
+    void resolveMode();
     window.addEventListener(CONSENT_CHANGED_EVENT, update);
     window.addEventListener('storage', update);
 
@@ -114,9 +177,8 @@ export function useAdsAllowed(): boolean {
   return allowed;
 }
 
-/** Read-only snapshot retained for existing diagnostics. */
 export function consentSignals(): {
-  mode: ConsentMode;
+  mode: ConsentMode | null;
   decision: ConsentValue | null;
   gpc: boolean;
   allowed: boolean;
