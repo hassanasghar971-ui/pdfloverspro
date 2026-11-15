@@ -47,7 +47,7 @@ export default function SocialBarGate() {
       if (typeof requestIdleCallback === 'function') {
         requestIdleCallback.call(window, load, { timeout: 2000 });
       } else {
-        window.setTimeout(load, 0);
+        setTimeout(load, 0);
       }
     };
 
