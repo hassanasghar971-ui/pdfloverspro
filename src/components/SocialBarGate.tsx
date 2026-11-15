@@ -14,6 +14,17 @@ const ADSENSE_SCRIPT_URL = ADSENSE_CLIENT
   ? `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(ADSENSE_CLIENT)}`
   : null;
 
+type IdleCallbackFn = (callback: () => void, options?: { timeout: number }) => number;
+
+function runWhenIdle(task: () => void): void {
+  const idle = (window as unknown as { requestIdleCallback?: IdleCallbackFn }).requestIdleCallback;
+  if (typeof idle === 'function') {
+    idle.call(window, task, { timeout: 2000 });
+  } else {
+    setTimeout(task, 0);
+  }
+}
+
 export default function SocialBarGate() {
   useEffect(() => {
     let interactions = 0;
@@ -34,21 +45,14 @@ export default function SocialBarGate() {
     const tryLoadAdsterraSocial = () => {
       if (!adsAllowed() || loaded || pending || interactions < 2) return;
       pending = true;
-      const load = () => {
+      runWhenIdle(() => {
         pending = false;
         if (!adsAllowed() || loaded) return;
         const script = GATED_SCRIPTS[0];
         if (!script) return;
         injectScript(script.id, script.src);
         loaded = true;
-      };
-
-      const requestIdleCallback = window.requestIdleCallback;
-      if (typeof requestIdleCallback === 'function') {
-        requestIdleCallback.call(window, load, { timeout: 2000 });
-      } else {
-        setTimeout(load, 0);
-      }
+      });
     };
 
     const onInteraction = () => {
