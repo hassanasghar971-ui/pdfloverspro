@@ -35,6 +35,12 @@ export default function SocialBarGate() {
       if (!adsAllowed() || loaded || pending || interactions < 2) return;
       pending = true;
 
+      const idle = (
+        window as unknown as {
+          requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        }
+      ).requestIdleCallback;
+
       const load = () => {
         pending = false;
         if (!adsAllowed() || loaded) return;
@@ -44,7 +50,11 @@ export default function SocialBarGate() {
         loaded = true;
       };
 
-      setTimeout(load, 300);
+      if (typeof idle === 'function') {
+        idle.call(window, load, { timeout: 2000 });
+      } else {
+        setTimeout(load, 0);
+      }
     };
 
     const onInteraction = () => {
