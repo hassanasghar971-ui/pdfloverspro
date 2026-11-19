@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 
 export type ConsentValue = 'granted' | 'denied';
+/** Retained for compatibility with existing diagnostics; ads always require opt-in. */
 export type ConsentMode = 'opt-in' | 'opt-out';
 
 const DECISION_KEY = 'plp_consent_v1';
-const MODE_KEY = 'plp_region_mode_v1';
 const MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
 export const CONSENT_CHANGED_EVENT = 'plp:consent';
 export const CONSENT_OPEN_EVENT = 'plp:consent-open';
 
+function emit(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(CONSENT_CHANGED_EVENT));
 let cachedMode: ConsentMode | null = null;
 let modePromise: Promise<ConsentMode> | null = null;
 
@@ -19,12 +21,20 @@ function emit(): void {
   }
 }
 
+/** A valid, unexpired affirmative decision must exist in localStorage. */
 export function getDecision(): ConsentValue | null {
   if (typeof window === 'undefined') return null;
 
   try {
     const raw = window.localStorage.getItem(DECISION_KEY);
     if (!raw) return null;
+    const data = JSON.parse(raw) as { value?: unknown; ts?: unknown };
+    if (
+      (data.value !== 'granted' && data.value !== 'denied') ||
+      typeof data.ts !== 'number' ||
+      !Number.isFinite(data.ts) ||
+      data.ts > Date.now() ||
+      Date.now() - data.ts > MAX_AGE_MS
 
     const data: unknown = JSON.parse(raw);
     if (!data || typeof data !== 'object') return null;
@@ -42,6 +52,9 @@ export function getDecision(): ConsentValue | null {
       window.localStorage.removeItem(DECISION_KEY);
       return null;
     }
+    return data.value;
+  } catch {
+    // If storage is unavailable or malformed, fail closed. Memory state never grants ads.
 
     return record.value;
   } catch {
@@ -52,7 +65,6 @@ export function getDecision(): ConsentValue | null {
 
 export function setDecision(value: ConsentValue): void {
   if (typeof window === 'undefined') return;
-
   try {
     window.localStorage.setItem(
       DECISION_KEY,
@@ -74,6 +86,19 @@ export function hasGpc(): boolean {
   );
 }
 
+/** Region never changes the default-deny ad policy; compatibility helper only. */
+export function getMode(): ConsentMode {
+  return 'opt-in';
+}
+
+/** Kept for older callers, with no network request or geo-based ad behavior. */
+export function resolveMode(): Promise<ConsentMode> {
+  return Promise.resolve('opt-in');
+}
+
+/** The one ad decision rule: only a stored explicit grant may enable ads. */
+export function adsAllowed(): boolean {
+  return typeof window !== 'undefined' && getDecision() === 'granted' && !hasGpc();
 export function getMode(): ConsentMode | null {
   if (typeof window === 'undefined') return null;
   if (cachedMode) return cachedMode;
@@ -164,7 +189,6 @@ export function useAdsAllowed(): boolean {
     const update = () => setAllowed(adsAllowed());
 
     update();
-    void resolveMode();
     window.addEventListener(CONSENT_CHANGED_EVENT, update);
     window.addEventListener('storage', update);
 
@@ -177,8 +201,9 @@ export function useAdsAllowed(): boolean {
   return allowed;
 }
 
+/** Read-only snapshot retained for diagnostics. */
 export function consentSignals(): {
-  mode: ConsentMode | null;
+  mode: ConsentMode;
   decision: ConsentValue | null;
   gpc: boolean;
   allowed: boolean;
