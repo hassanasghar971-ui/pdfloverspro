@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { adsAllowed, CONSENT_CHANGED_EVENT } from '@/lib/consent';
-import {
-  GATED_SCRIPTS,
-  injectScript,
-  removeScript,
-} from '@/lib/ads';
+import { GATED_SCRIPTS, injectScript, removeScript } from '@/lib/ads';
 
 const ADSENSE_SCRIPT_ID = 'google-adsense-client';
 const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_CLIENT?.trim();
@@ -47,12 +43,30 @@ export default function SocialBarGate() {
       } else {
         window.setTimeout(load, 0);
       }
+      if (ADSENSE_SCRIPT_URL && !document.getElementById(ADSENSE_SCRIPT_ID)) {
+        const script = injectScript(ADSENSE_SCRIPT_ID, ADSENSE_SCRIPT_URL);
+        script?.setAttribute('crossorigin', 'anonymous');
+      }
+    };
+
+    const tryLoadAdsterraSocial = () => {
+      if (!adsAllowed() || loaded || pending || interactions < 2) return;
+      pending = true;
+      runWhenIdle(() => {
+        pending = false;
+        if (!adsAllowed() || loaded) return;
+        const script = GATED_SCRIPTS[0];
+        if (!script) return;
+        injectScript(script.id, script.src);
+        loaded = true;
+      });
     };
 
     const onInteraction = () => {
       interactions += 1;
       tryLoadAdsterraSocial();
     };
+
     const onConsent = () => {
       if (!adsAllowed()) {
         for (const script of GATED_SCRIPTS) removeScript(script.id);

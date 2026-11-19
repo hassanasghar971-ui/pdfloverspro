@@ -11,12 +11,21 @@ import { categoryIds, categoryInfo, safeJson, toCard } from '@/lib/tool-view';
 // Rendered title stays under 60 characters.
 const TITLE = `${SITE.name}: ${TOOL_COUNT} Free PDF Tools in Your Browser`;
 const DESCRIPTION = `Merge, split, compress, convert, sign and edit PDFs with ${TOOL_COUNT} free tools. Files are processed in your browser and not uploaded to our servers. No sign-up.`;
+const HOME_URL = `${SITE.url.replace(/\/+$/, '')}/`;
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
   description: DESCRIPTION,
-  alternates: { canonical: SITE.url },
-  openGraph: { title: TITLE, description: DESCRIPTION, url: SITE.url, type: 'website', siteName: SITE.name },
+  alternates: { canonical: HOME_URL },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: HOME_URL,
+    type: 'website',
+    siteName: SITE.name,
+    locale: 'en_US',
+  },
+  twitter: { card: 'summary', title: TITLE, description: DESCRIPTION },
 };
 
 const STEPS = [
