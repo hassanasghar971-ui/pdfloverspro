@@ -29,26 +29,11 @@ export default function ConsentBanner() {
   useEffect(() => {
     setGpc(hasGpc());
     setOpen(getDecision() === null);
+
     const onOpen = () => setOpen(true);
     window.addEventListener(CONSENT_OPEN_EVENT, onOpen);
+
     return () => window.removeEventListener(CONSENT_OPEN_EVENT, onOpen);
-    let active = true;
-
-    setGpc(hasGpc());
-
-    void resolveMode().then((mode) => {
-      if (active && mode === 'opt-in' && getDecision() === null) {
-        setOpen(true);
-      }
-    });
-
-    const onOpen = () => setOpen(true);
-    window.addEventListener(CONSENT_OPEN_EVENT, onOpen);
-
-    return () => {
-      active = false;
-      window.removeEventListener(CONSENT_OPEN_EVENT, onOpen);
-    };
   }, []);
 
   const choose = useCallback((value: ConsentValue) => {
@@ -80,9 +65,6 @@ export default function ConsentBanner() {
             when configured, Google AdSense may use cookies or similar technologies. No advertising
             scripts load unless you choose to accept. You can change your choice any time in Cookie
             settings.{gpc ? ' Your browser also sends a Global Privacy Control signal.' : ''}{' '}
-            when configured, Google AdSense may use cookies or similar technologies. In this region,
-            ads load only if you accept. You can change your choice any time in Cookie settings.
-            {gpc ? ' Your browser also sends a Global Privacy Control signal.' : ''}{' '}
             See our{' '}
             <Link href="/privacy-policy" className="font-medium text-slate-900 underline">
               Privacy Policy

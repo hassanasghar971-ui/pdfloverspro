@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { adsAllowed, CONSENT_CHANGED_EVENT } from '@/lib/consent';
 import { GATED_SCRIPTS, injectScript, removeScript } from '@/lib/ads';
 
@@ -30,36 +30,23 @@ export default function SocialBarGate() {
     const tryLoadAdsterraSocial = () => {
       if (!adsAllowed() || loaded || pending || interactions < 2) return;
       pending = true;
+
       const load = () => {
         pending = false;
         if (!adsAllowed() || loaded) return;
+
         const script = GATED_SCRIPTS[0];
         if (!script) return;
+
         injectScript(script.id, script.src);
         loaded = true;
       };
+
       if ('requestIdleCallback' in window) {
         window.requestIdleCallback(load, { timeout: 2000 });
       } else {
         window.setTimeout(load, 0);
       }
-      if (ADSENSE_SCRIPT_URL && !document.getElementById(ADSENSE_SCRIPT_ID)) {
-        const script = injectScript(ADSENSE_SCRIPT_ID, ADSENSE_SCRIPT_URL);
-        script?.setAttribute('crossorigin', 'anonymous');
-      }
-    };
-
-    const tryLoadAdsterraSocial = () => {
-      if (!adsAllowed() || loaded || pending || interactions < 2) return;
-      pending = true;
-      runWhenIdle(() => {
-        pending = false;
-        if (!adsAllowed() || loaded) return;
-        const script = GATED_SCRIPTS[0];
-        if (!script) return;
-        injectScript(script.id, script.src);
-        loaded = true;
-      });
     };
 
     const onInteraction = () => {
@@ -70,6 +57,7 @@ export default function SocialBarGate() {
     const onConsent = () => {
       if (!adsAllowed()) {
         for (const script of GATED_SCRIPTS) removeScript(script.id);
+        removeScript(ADSENSE_SCRIPT_ID);
         loaded = false;
         pending = false;
       } else {
@@ -89,6 +77,7 @@ export default function SocialBarGate() {
       window.removeEventListener('keydown', onInteraction);
       window.removeEventListener(CONSENT_CHANGED_EVENT, onConsent);
       window.removeEventListener('storage', onConsent);
+
       if (!adsAllowed()) {
         removeScript(ADSENSE_SCRIPT_ID);
         for (const script of GATED_SCRIPTS) removeScript(script.id);
