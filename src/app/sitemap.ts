@@ -15,7 +15,6 @@ const LEGAL_PATHS = [
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const base = SITE_URL.replace(/\/+$/, '');
-  const now = new Date();
 
   const toolUrls = getAllSlugs()
     .filter((slug: string) => isToolAvailable(slug))
@@ -27,8 +26,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...LEGAL_PATHS.map((path) => `${base}${path}`),
   ];
 
-  return Array.from(new Set(urls)).map((url) => ({
-    url,
-    lastModified: now,
-  }));
+  return Array.from(new Set(urls)).map((url) => ({ url }));
 }
